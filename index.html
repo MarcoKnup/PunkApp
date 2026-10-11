@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Punk App</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#111111">
+    
+    <!-- CSS Esterno -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Firebase SDK (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
+</head>
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="user-badge-container">
+            <div class="user-badge" id="userBadgeDisplay" onclick="openLoginModal(true)">👤 Inserisci Nome</div>
+        </div>
+        
+        <button class="global-chat-btn" onclick="openGlobalChatModal()">
+            <span>💬 Chat</span> <span class="global-chat-badge" id="globalChatBadgeCount">0</span>
+        </button>
+        
+        <button class="notification-bell-btn" onclick="openNotificationsModal()">
+            <span>🔔 Notifiche</span> <span class="notif-badge-count" id="notifBadgeCount">0</span>
+        </button>
+
+        <h1>Punk App</h1>
+        <p>Exclusive Night Life Platform</p>
+        
+        <button class="admin-btn" id="ordinazioniBtn" onclick="openOrdinazioniSection()">
+            <span>🔒 Gestione</span>
+            <span>& Ordini</span>
+            <span class="admin-badge-count" id="adminUnreadBadge">0</span>
+        </button>
+    </header>
+
+    <!-- Modal Login -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <div class="modal-app-title">Punk App</div>
+            <h2 id="modalTitle">Accesso Richiesto</h2>
+            <p id="modalDesc">Inserisci il tuo Nome o Soprannome per accedere alla Punk App.</p>
+            <input type="text" id="usernameInput" onkeydown="if(event.key==='Enter') saveUsername()" />
+            <button class="btn-primary" onclick="saveUsername()">Entra nell'App</button>
+            <button class="btn-secondary" id="logoutBtn" style="display:none;" onclick="logout()">Cambia Account / Nome</button>
+            <button class="btn-secondary" id="cancelModalBtn" style="display:none; margin-top:5px;" onclick="closeLoginModal()">Annulla</button>
+        </div>
+    </div>
+
+    <!-- Modal DETTAGLI UTENTE VIP (QR CLICK) -->
+    <div class="modal" id="vipDetailsModal">
+        <div class="modal-content" style="max-width: 380px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2 style="color: var(--accent-pink); font-size: 1.1rem; margin:0;">Pass VIP - Dettagli Utente</h2>
+                <button onclick="closeVipDetailsModal()" style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            <div id="vipDetailsContent" style="display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem; color: #f1f1f1;"></div>
+            <button class="btn-primary" style="margin-top: 16px;" onclick="closeVipDetailsModal()">Chiudi</button>
+        </div>
+    </div>
+
+    <!-- Modal RUOTA DELLA FORTUNA INTERATTIVA -->
+    <div class="modal" id="luckyWheelModal">
+        <div class="modal-content" style="max-width: 360px; text-align: center; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h2 style="color: var(--accent-yellow); font-size: 1.1rem; margin:0;">🎰 Ruota della Fortuna</h2>
+                <button onclick="closeLuckyWheelModal()" style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            <p style="font-size: 0.78rem; color: #9a9ab0; margin-bottom: 14px;">Tenta la sorte e vinci premi o punti VIP!</p>
+            
+            <div style="position: relative; width: 260px; height: 260px; margin: 0 auto 16px auto;">
+                <div style="position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-top: 18px solid var(--accent-yellow); z-index: 20; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));"></div>
+                <canvas id="wheelCanvas" width="260" height="260" style="width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 0 20px rgba(255, 230, 0, 0.3); border: 3px solid var(--accent-yellow);"></canvas>
+            </div>
+
+            <div id="wheelResultBanner" style="font-size: 0.95rem; font-weight: bold; color: var(--accent-yellow); margin-bottom: 16px; min-height: 24px;"></div>
+
+            <button class="btn-primary" id="modalSpinBtn" style="background: linear-gradient(90deg, var(--accent-yellow), var(--accent-orange)); color: #000; font-weight: 900;" onclick="executeWheelSpinAnimation()">GIRA LA RUOTA</button>
+        </div>
+    </div>
+
+    <!-- Modal CHAT A DUE COLONNE CON FOTO -->
+    <div class="modal" id="globalChatModal">
+        <div class="modal-content" style="max-width: 540px; text-align: left; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <h2 style="color: var(--accent-cyan); font-size: 1.1rem; margin:0;" id="globalChatHeaderTitle">💬 Hub Chat</h2>
+                <div style="display: flex; gap: 8px;">
+                    <button id="chatHeaderGalleryBtn" onclick="openPhotoGalleryModal()" style="background: rgba(0, 240, 255, 0.15); border: 1px solid var(--accent-cyan); color: var(--accent-cyan); padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: bold; cursor: pointer;">🖼️ Galleria Globale</button>
+                    <button onclick="closeGlobalChatModal()" style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
+                </div>
+            </div>
+
+            <div class="chat-split-layout">
+                <div class="chat-sidebar" id="chatSidebarList">
+                    <div class="contact-btn active" id="btnSidebarGlobal" onclick="selectChatRoom('global')">
+                        <span>💬 Globale</span>
+                    </div>
+                    <div style="font-size: 0.6rem; color: #9a9ab0; margin: 4px 0 2px 2px; text-transform: uppercase;">Utenti:</div>
+                    <div id="chatSidebarUsersList" style="display: flex; flex-direction: column; gap: 4px;"></div>
+                </div>
+
+                <div class="chat-main-pane">
+                    <div class="chat-messages" id="globalChatMessagesBox">
+                        <div class="empty-orders">Seleziona una chat a sinistra.</div>
+                    </div>
+                    <div class="chat-input-bar">
+                        <input type="file" id="chatImageInput" accept="image/*" style="display:none;" onchange="handleImageUpload(this)" />
+                        <button onclick="document.getElementById('chatImageInput').click()" style="background: rgba(255,255,255,0.1); border: 1px solid #444; color: #fff; padding: 6px 8px; border-radius: 8px; font-size: 0.9rem; cursor: pointer;" title="Allega Foto">📷</button>
+                        <input type="text" id="globalChatInputText" placeholder="Scrivi un messaggio..." onkeydown="if(event.key==='Enter') sendActiveChatMessage()" />
+                        <button class="btn-primary" onclick="sendActiveChatMessage()">Invia</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal GALLERIA FOTO -->
+    <div class="modal" id="photoGalleryModal">
+        <div class="modal-content" style="max-width: 420px; text-align: left; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2 id="photoGalleryModalTitle" style="color: var(--accent-yellow); font-size: 1.1rem; margin:0;">🖼️ Galleria Foto</h2>
+                <button onclick="closePhotoGalleryModal()" style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            <p id="photoGalleryModalDesc" style="font-size: 0.78rem; color: #9a9ab0; margin-bottom: 10px;">Momenti condivisi nella chat.</p>
+            <div id="photoGalleryContainer">
+                <div class="empty-orders">Nessuna foto trovata.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal FOTO A SCHERMO INTERO -->
+    <div class="modal" id="singlePhotoModal">
+        <div style="max-width: 90%; max-height: 90%; text-align: center;">
+            <img id="fullSizePhotoImg" src="" style="max-width: 100%; max-height: 75vh; border-radius: 12px; border: 2px solid var(--accent-cyan);" />
+            <div id="fullSizePhotoMeta" style="color: #fff; font-size: 0.85rem; margin-top: 8px;"></div>
+            <div style="margin-top: 12px; display: flex; gap: 10px; justify-content: center;">
+                <button id="deletePhotoBtn" class="btn-danger-clear" style="width: auto; padding: 8px 16px; margin: 0; font-size: 0.8rem; display: none;" onclick="deleteCurrentViewingPhoto()">🗑️ Elimina Foto</button>
+                <button class="btn-secondary" style="width: auto; padding: 8px 16px; margin: 0; font-size: 0.8rem;" onclick="closeSinglePhotoModal()">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal NOTIFICHE -->
+    <div class="modal" id="notificationsModal">
+        <div class="modal-content" style="max-width: 400px; text-align: left; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h2 style="color: var(--accent-cyan); font-size: 1.1rem; margin:0;">🔔 Le Mie Notifiche</h2>
+                <button onclick="closeNotificationsModal()" style="background:none; border:none; color:#fff; font-size:1.2rem; cursor:pointer;">✕</button>
+            </div>
+            
+            <button class="btn-danger-clear" onclick="clearAllNotifications()" style="margin-bottom: 10px; padding: 8px; font-size: 0.75rem;">🗑️ Svuota Tutte le Notifiche</button>
+            
+            <div id="notificationsListContainer" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;">
+                <div class="empty-orders">Nessuna notifica ricevuta.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Conferma Ordine -->
+    <div class="modal" id="checkoutReviewModal">
+        <div class="modal-content" style="max-width: 420px; text-align: left;">
+            <div style="text-align: center; margin-bottom: 10px;">
+                <div class="modal-app-title" style="font-size: 1.3rem; margin-bottom: 2px;">Riepilogo Ordine</div>
+                <p style="margin: 0; font-size: 0.78rem; color: var(--accent-yellow);">Controlla la tua selezione prima di inviare</p>
+            </div>
+            
+            <div id="orderRoastCommentBox" style="background: rgba(0, 240, 255, 0.08); border: 1px dashed var(--accent-cyan); padding: 10px 12px; border-radius: 10px; margin-bottom: 12px; text-align: center;">
+                <span id="orderRoastText" style="font-size: 0.85rem; font-weight: bold; color: var(--accent-cyan); font-style: italic;"></span>
+            </div>
+
+            <div id="checkoutItemsList" style="max-height: 180px; overflow-y: auto; margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px;"></div>
+
+            <button class="btn-secondary" style="margin-top: 0; margin-bottom: 12px;" onclick="closeCheckoutReviewModal()">✏️ Modifica la scelta</button>
+            <button class="btn-primary" style="width: 100%; padding: 12px; font-size: 0.95rem;" onclick="confirmAndSendOrder()">Invia Ordine</button>
+        </div>
+    </div>
+
+    <!-- Modal Successo -->
+    <div class="modal" id="successModal">
+        <div class="modal-content" style="max-width: 320px; text-align: center; border-color: var(--accent-green); box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);">
+            <div style="font-size: 3rem; margin-bottom: 10px;">✅</div>
+            <div style="font-size: 1.25rem; font-weight: 900; color: var(--accent-green); text-transform: uppercase;">
+                ORDINE INVIATO CORRETTAMENTE
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="tabs" id="tabsBar">
+            <button class="tab-btn active" id="tabBtnVenerdi" onclick="switchTab('venerdi', this)">🎉 Venerdì</button>
+            <button class="tab-btn" onclick="switchTab('history', this)">📜 Le Mie Serate</button>
+            <button class="tab-btn" onclick="switchTab('vip', this)">💳 VIP Card</button>
+            <button class="tab-btn" onclick="switchTab('ranking', this)">🏆 Classifica</button>
+        </div>
+
+        <!-- TAB VENERDÌ SERA -->
+        <div class="section-page active" id="tab-venerdi">
+            <div class="countdown-widget" id="countdownWidgetContainer">
+                <div class="countdown-title" id="countdownTitleElem">⏳ Conto alla Rovescia Prossimo Venerdì</div>
+                <div class="countdown-timers" id="countdownTimersBox">
+                    <div class="countdown-box">
+                        <div class="countdown-number" id="cdDays">00</div>
+                        <div class="countdown-label">Giorni</div>
+                    </div>
+                    <div class="countdown-box">
+                        <div class="countdown-number" id="cdHours">00</div>
+                        <div class="countdown-label">Ore</div>
+                    </div>
+                    <div class="countdown-box">
+                        <div class="countdown-number" id="cdMins">00</div>
+                        <div class="countdown-label">Minuti</div>
+                    </div>
+                    <div class="countdown-box">
+                        <div class="countdown-number" id="cdSecs">00</div>
+                        <div class="countdown-label">Secondi</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PASS VIP DIGITALE STILE LAS VEGAS -->
+            <div class="las-vegas-pass-box">
+                <div style="font-size: 0.85rem; font-weight: 900; color: var(--accent-yellow); text-transform: uppercase; letter-spacing: 1.2px; text-shadow: 0 0 8px rgba(255,230,0,0.5);">🌟 Pass VIP Digitale 🌟</div>
+                <p style="font-size: 0.65rem; color: #9a9ab0; margin-top: 2px;">Tocca il QR Code per vedere i tuoi dettagli utente.</p>
+                
+                <div class="vip-qr-container" onclick="openVipDetailsModal()" title="Clicca per vedere i dati utente">
+                    <canvas id="vipQrCanvas" width="95" height="95" style="display: block;"></canvas>
+                </div>
+                <div id="vipPassMetaText" style="font-size: 0.72rem; font-weight: bold; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.8px;">PUNK-PASS: OSPITE</div>
+            </div>
+
+            <div id="venerdiRewardsContainer" style="display: none;">
+                <div class="category-title" style="color: var(--accent-green);">🎁 I Tuoi Premi da Usare Stasera</div>
+                <div id="venerdiAvailableRewardsList"></div>
+            </div>
+
+            <div class="category-title">🍸 Drink Gin</div>
+            <div class="grid" id="menuGrid-Gin"></div>
+
+            <div class="category-title">🥤 Analcolici, Acqua, Birra & Vino</div>
+            <div class="grid" id="menuGrid-Analcolici"></div>
+
+            <div class="category-title">🌿 Smoke Selection</div>
+            <div class="grid" id="menuGrid-Smoke"></div>
+
+            <div class="category-title">🎮 PlayStation 3</div>
+            <div class="grid" id="menuGrid-PS3"></div>
+
+            <div class="category-title">🎴 Giochi di Carte</div>
+            <div class="grid" id="menuGrid-Carte"></div>
+        </div>
+
+        <!-- TAB STORICO SERATE -->
+        <div class="section-page" id="tab-history">
+            <div class="level-progress-card">
+                <div class="level-card-header">
+                    <div class="level-title-badge" id="userLevelTitle">Principiante</div>
+                    <div class="level-number-badge" id="userLevelNumber">Livello 1 / 10</div>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="levelProgressBar"></div>
+                </div>
+                <div class="level-card-footer">
+                    <span id="userPointsStat">0 / 1000 Punti</span>
+                    <span id="nextLevelStat">Mancano 100 P. al prossimo livello</span>
+                </div>
+            </div>
+
+            <div class="category-title">📖 Le Tue Serate Programmate</div>
+            <button class="btn-danger-clear" onclick="clearMyHistory()">🗑️ Azzera Le Mie Serate</button>
+            <div id="userHistoryList">
+                <div class="empty-orders">Nessuna serata ancora registrata. Invia un ordine per iniziare!</div>
+            </div>
+        </div>
+
+        <!-- TAB VIP CARD & PREMI -->
+        <div class="section-page" id="tab-vip">
+            <div class="vip-card">
+                <div style="font-size: 0.85rem; opacity: 0.9; text-transform: uppercase; font-weight: bold;">TESSERA VIP PERSONALE</div>
+                <div class="vip-points" id="pointsDisplay">0 Punti</div>
+            </div>
+
+            <div class="lucky-wheel-card">
+                <div class="lucky-wheel-header">
+                    <span>🎰 La Ruota della Fortuna</span>
+                </div>
+                <div>
+                    <span class="wheel-status-badge" id="wheelBadgeStatus">✨ 1 Giro Gratis Disponibile Oggi</span>
+                </div>
+                
+                <div class="wheel-display-box" id="wheelDisplayBox">
+                    Tenta la Sorte!
+                </div>
+
+                <button class="btn-primary" id="wheelSpinBtn" style="background: linear-gradient(90deg, var(--accent-yellow), var(--accent-orange)); color: #000; font-weight: 900;" onclick="openLuckyWheelModal()">Gira Gratis (0 P.)</button>
+            </div>
+
+            <div class="ready-rewards-box">
+                <div class="ready-rewards-header">
+                    <span>🎁 PREMI RISCATTATI PRONTI ALL'USO</span>
+                </div>
+                <div id="readyRewardsList">
+                    <div class="empty-orders">Nessun premio riscattato al momento. Riscattane uno dal catalogo qui sotto!</div>
+                </div>
+            </div>
+
+            <div class="category-title">🛍️ Catalogo Premi Fedeltà</div>
+            <div id="vipCatalogContainer"></div>
+        </div>
+
+        <!-- TAB CLASSIFICA PRESENZE -->
+        <div class="section-page" id="tab-ranking">
+            <div class="category-title">🏆 Classifica Presenze del Venerdì</div>
+            <p style="font-size:0.8rem; color:#9a9ab0; margin-bottom:16px;">La classifica mostra gli utenti ordinati in base al numero di serate concluse ed archiviate.</p>
+            <div id="rankingListContainer">
+                <div class="empty-orders">Nessun utente in classifica al momento.</div>
+            </div>
+        </div>
+
+        <!-- SEZIONE GESTIONE & ORDINI (PUNK) -->
+        <div class="section-page" id="tab-admin">
+            <div class="admin-header-actions">
+                <button class="btn-exit-admin" onclick="exitAdmin()">⬅️ Torna alla Home</button>
+                <span style="font-size: 0.8rem; color: var(--accent-pink); font-weight: bold;">Area Riservata Punk</span>
+            </div>
+
+            <div class="tabs" id="adminTabsBar">
+                <button class="tab-btn active" onclick="switchAdminTab('admin-orders', this)">📥 Ordini & Archivio</button>
+                <button class="tab-btn" onclick="switchAdminTab('admin-menu', this)">⚙️ Gestione Menu</button>
+                <button class="tab-btn" onclick="switchAdminTab('admin-rewards', this)">🎁 Gestione Premi VIP</button>
+                <button class="tab-btn" onclick="switchAdminTab('admin-users', this)">👥 Utenti</button>
+            </div>
+
+            <div class="admin-sub-page" id="admin-sub-orders">
+                <div class="category-title">🔔 Ordini Ricevuti In Attesa</div>
+                <div id="adminOrdersList"><div class="empty-orders">Nessun ordine attivo al momento.</div></div>
+
+                <button class="btn-toggle-archive" onclick="toggleArchiveVisibility()" style="margin-top:20px;">
+                    <span>📂 Archivio Storico Ordini (<span id="archiveCount">0</span>)</span>
+                    <span id="archiveToggleIcon">▼</span>
+                </button>
+                
+                <div id="archiveSection" style="display: none;">
+                    <button class="btn-danger-clear" onclick="clearAdminArchive()" style="margin-top:10px;">🗑️ Azzera Archivio Storico</button>
+                    <div id="adminArchiveList"><div class="empty-orders">L'archivio è vuoto.</div></div>
+                </div>
+            </div>
+
+            <div class="admin-sub-page" id="admin-sub-menu" style="display: none;">
+                <div class="category-title">⚙️ Aggiungi Elemento al Menu</div>
+                <div class="menu-editor-box">
+                    <select id="newMenuCategory">
+                        <option value="Gin">Drink Gin</option>
+                        <option value="Analcolici">Analcolici, Acqua, Birra & Vino</option>
+                        <option value="Smoke">Smoke Selection</option>
+                        <option value="PS3">PlayStation 3</option>
+                        <option value="Carte">Giochi di Carte</option>
+                    </select>
+                    <input type="text" id="newMenuName" placeholder="Nome prodotto" />
+                    <input type="text" id="newMenuDesc" placeholder="Descrizione" />
+                    <input type="text" id="newMenuBadge" placeholder="Badge (es. Bar, Special)" />
+                    <input type="text" id="newMenuPoints" placeholder="Punti base (es. 25, 40)" />
+                    <button class="btn-primary" onclick="addNewMenuItem()">Aggiungi al Menu Live</button>
+                </div>
+
+                <div class="category-title">🗑️ Gestione Prodotti per Tipologia</div>
+                <div id="adminMenuListContainer"></div>
+            </div>
+
+            <div class="admin-sub-page" id="admin-sub-rewards" style="display: none;">
+                <div class="category-title">🎁 Aggiungi Nuovo Premio VIP</div>
+                <div class="menu-editor-box">
+                    <input type="text" id="newRewardName" placeholder="Nome premio (es. 🍸 Gin Mare 1.5L)" />
+                    <input type="number" id="newRewardCost" placeholder="Costo in Punti (es. 800)" />
+                    <button class="btn-primary" onclick="addNewVipReward()">Aggiungi al Catalogo VIP</button>
+                </div>
+
+                <div class="category-title">🛍️ Catalogo Premi Attuali</div>
+                <div id="adminRewardsListContainer"></div>
+            </div>
+
+            <div class="admin-sub-page" id="admin-sub-users" style="display: none;">
+                <div class="category-title">📢 COMUNICAZIONI GLOBALI</div>
+                <div class="menu-editor-box" style="text-align: center;">
+                    <textarea id="broadcastMsgInput" placeholder="Scrivi una notifica da inviare a tutti gli utenti..." style="margin-bottom: 10px;"></textarea>
+                    <button class="btn-primary" style="background: linear-gradient(90deg, var(--accent-pink), var(--accent-cyan)); color: #000; font-weight: 900;" onclick="sendBroadcastNotification()">📢 INVIA NOTIFICHE A TUTTI GLI UTENTI</button>
+                </div>
+
+                <div class="category-title">👥 UTENTI REGISTRATI & ATTIVI</div>
+                <div class="menu-editor-box" id="adminUsersListContainer">
+                    <div class="empty-orders">Nessun utente registrato trovato.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="order-bar" id="orderBar" style="display: flex;">
+        <div class="order-summary">Selezionati: <span id="selectedCount">0</span> oggetti</div>
+        <button class="btn-primary" style="width: auto; padding: 10px 20px;" onclick="prepareOrderReview()">Invia Ordine</button>
+    </div>
+
+    <!-- JavaScript Logico Esterno -->
+    <script src="app.js"></script>
+</body>
+</html>
