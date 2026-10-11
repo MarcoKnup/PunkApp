@@ -2733,7 +2733,7 @@ function openOrdinazioniSection() {
     renderAdminUsersList();
     renderOrders();
 }
-/* aggiornato */
+
 function exitAdmin() {
     document.getElementById("tabsBar").style.display = "flex";
     document.getElementById('tab-admin').style.display = 'none';
